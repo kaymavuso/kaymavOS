@@ -4,10 +4,20 @@ ORG 0   ; Assemble code as if it starts at address 0x0000.
         ; while the code will actually execute starting from 0x7C00.
 
 BITS 16             ; Assemble for 16-bit architecture (real mode).
+_start:
+    jmp short start; Jump to start label.
+    nop             ; This command tells the assembler to do nothing (No operation).
 
-jmp 0x7C0:start     ; Ensuring the code segment starts at physical address 0x7C00.
+times 33 db 0       ; Padding with 33 bytes of zeros to create space for the BIOS parameter block in the boot sector
+                    ; at physical address 0x7C00. The boot sector is only 512 bytes in size,
+                    ;and it must contain both the bootloader code and the BPB. This padding is necessary to ensure
+                    ; the BPB has its designated space in the boot sector. This also ensures that the
+                    ; bootloader and file system will co-exist coexist correctly in the first 512 bytes of the boot sector.
 
 start:
+jmp 0x7C0:step2     ; Ensuring the Code Segment register starts at physical address 0x7C00 and jump to step2.
+
+step2:
     cli             ; Disable interrupts for critical operations.
 
     ;===== Initialize segment registers to be in control of how BIOS sets up the registers =====
@@ -41,7 +51,7 @@ print_char:
     int 0x10        ; Call BIOS video service to print AL.
     ret             ; Return from print_char function.
 
-message: db 'Hello World, from kaymavOS! :-', 0 ; Message string with null terminator.
+message: db 'Hello World, get fucked! :-', 0 ; Message string with null terminator.
 
 times 510-($ - $$) db 0 ; Pad code to 512 bytes for boot sector.
 

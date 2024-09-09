@@ -17,12 +17,7 @@ times 33 db 0       ; Padding with 33 bytes of zeros to create space for the BIO
 start:
 jmp 0x7C0:step2     ; Ensuring the Code Segment register starts at physical address 0x7C00 and jump to step2.
 
-handle_zero:        ; Creating a custom interrupt handler.
-    mov ah, 0eh     ; Set function for BIOS interrupt ( to print a character).
-    mov al, 'A'     ; Loads the ASCII value of 'A' into the AL register.
-    mov bx, 0x00    ; Clear BX register by setting it to 0.
-    int 0x10        ; Calss the BIOS video interrupt to print the character in AL.
-    iret            ; Returns from the interrupt handler (handle_zero), restoring the previous state.
+
 
 step2:
     cli             ; Disable interrupts for critical operations.
@@ -38,13 +33,23 @@ step2:
     mov sp, 0x7C00  ; Set Stack Pointer (SP) to 0x7C00 to ensure that the stack operates in the correct memory area.
     sti             ; Re-enable interrupts.
 
-    mov word[ss:0x00], handle_zero ; Stores the offset (address) of the `handler_zero` interrupt handler as the begining of the stack segment.
-    mov word[ss:0x02], 0x7C0       ; Stores the segment base (0x7C0) for the interrupt handler. This setup creates an interrupt vector entry at 0x0000:0000 in memory, pointing to 0x7C0:handle_zero.
+    mov ah, 2       ; Set function for BIOS interrupt (read sector COMMAND).
+    mov al, 1       ; Set number of sectors to read.
+    mov ch, 0       ; Set cylinder number to 0. Cylinder low eight bits.
+    mov cl, 2       ; Set sector number to 2. Read sector 2.
+    mov ch, 0       ; Set cylinder number to 0. Cylinder high eight bits.
+    mov bx, buffer  ; Set address of buffer to load the sector into.
+    int 0x13        ; Invoke the read sector interrupt handler.
+    jc error        ; Jump to error if CF is set.
 
-    int 0           ; Invoke the interrupt handler. Triggers interrupt 0.
-
-    mov si, message ; Load address of message into SI.
+    mov si, buffer  ; Load address of buffer into SI.
     call print      ; Call print function to display the message.
+    jmp $           ; Infinite loop to halt execution.
+
+error:
+    mov si, error_message ; Load address of error_message into SI.
+    call print            ; Call print function to display the error message.
+
     jmp $           ; Infinite loop to halt execution.
 
 print:              ; print is a subroutine, a reusable piece of code.
@@ -63,8 +68,10 @@ print_char:         ; print_char is a subroutine, a reusable piece of code.
     int 0x10        ; Interrupt the flow of execution to call BIOS video service to print AL.
     ret             ; Return from print_char function. Return to the calling code.
 
-message: db 'Ola World, get fucked! :-', 0 ; Message string with null terminator.
+error_message: db 'Failed to load sector', 0 ; Message string with null terminator.
 
 times 510-($ - $$) db 0 ; Pad code to 512 bytes for boot sector.
 
 dw 0xAA55 ; Boot signature required by BIOS.
+
+buffer:
